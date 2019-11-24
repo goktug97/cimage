@@ -155,8 +155,8 @@ def main(canvas):
                     image.width += 1
                     image.height += 1
                 elif key == config.KeyBindings.zoom_out:
-                    image.width -= 1
-                    image.height -= 1
+                    image.width = max(image.width-1, 1)
+                    image.height = max(image.height-1, 1)
                 elif key == config.KeyBindings.reset:
                     image.width = width
                     image.height = height
