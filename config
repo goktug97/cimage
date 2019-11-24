@@ -11,3 +11,5 @@ class KeyBindings:
     next_image: str = 'n'
     previous_image: str = 'p'
     quit_program: str = 'q'
+    zoom_in: str = 'K'
+    zoom_out: str = 'J'

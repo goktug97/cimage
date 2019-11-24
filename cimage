@@ -89,32 +89,32 @@ def calculate_pos_and_size(idx):
 @ueberzug.Canvas()
 def main(canvas):
     n_inputs = len(args.input)
-    current_index = 0
+    current_idx = 0
 
-    x, y, width, height = calculate_pos_and_size(current_index)
+    x, y, width, height = calculate_pos_and_size(current_idx)
 
     image = canvas.create_placement('image', x=x, y=y,
             width=width,
             height=height,
             scaler=ueberzug.ScalerOption.FIT_CONTAIN.value)
-    image.path = args.input[current_index]
+    image.path = args.input[current_idx]
     image.visibility = ueberzug.Visibility.VISIBLE
 
-    prev_width, prev_height = width, height
+    prev_width, prev_height, prev_idx = width, height, current_idx
     with KeyPoller() as keyPoller:
         while True:
             key = keyPoller.poll()
-            image.path = args.input[current_index]
+            image.path = args.input[current_idx]
 
-            x, y, width, height = calculate_pos_and_size(current_index)
-            if prev_width != width or prev_height != height:
+            x, y, width, height = calculate_pos_and_size(current_idx)
+            if prev_width != width or prev_height != height or prev_idx != current_idx:
+                image.width = width
+                image.height = height
                 prev_width = width
                 prev_height = height
+                prev_idx = current_idx
                 image.x = x
                 image.y = y
-
-            image.width = width
-            image.height = height
 
             if key is not None:
                 if key == config.KeyBindings.move_image_down:
@@ -126,11 +126,17 @@ def main(canvas):
                 elif key == config.KeyBindings.move_image_right:
                     image.x += 1
                 elif key == config.KeyBindings.next_image:
-                    current_index += 1
-                    current_index %= n_inputs
+                    current_idx += 1
+                    current_idx %= n_inputs
                 elif key == config.KeyBindings.previous_image:
-                    current_index -= 1
-                    current_index %= n_inputs
+                    current_idx -= 1
+                    current_idx %= n_inputs
+                elif key == config.KeyBindings.zoom_in:
+                    image.width += 1
+                    image.height += 1
+                elif key == config.KeyBindings.zoom_out:
+                    image.width -= 1
+                    image.height -= 1
                 elif key == config.KeyBindings.quit_program or ord(key) == 27:
                     break
 
