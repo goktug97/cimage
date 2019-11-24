@@ -3,11 +3,9 @@
 import os
 import sys
 import ueberzug.lib.v0 as ueberzug
-import time
-import subprocess
-from PIL import Image
 import array, fcntl, termios
 import select
+from image_size import get_image_size
 
 # https://stackoverflow.com/a/31736883
 class KeyPoller():
@@ -30,18 +28,23 @@ class KeyPoller():
             return sys.stdin.read(1)
         return None
 
+
 @ueberzug.Canvas()
-def main(canvas):
-    # Columns, Rows number of char
+def main(canvas): # Columns, Rows number of char
     # Width, Height number of pixel
     image_path = sys.argv[1]
-    image = Image.open(image_path)
+    try:
+        image_width, image_height = get_image_size.get_image_size(image_path)
+    except get_image_size.UnknownImageFormat:
+        raise ValueError("Unknown Image Format")
+
     rows, columns = map(int, os.popen('stty size', 'r').read().split())
     buf = array.array('H', [0, 0, 0, 0])
     fcntl.ioctl(1, termios.TIOCGWINSZ, buf)
     terminal_width, terminal_height = buf[2], buf[3]
-    image.thumbnail((terminal_width, terminal_height), Image.ANTIALIAS)
-    image_width, image_height = image.size
+    scale = min(terminal_width/image_width, terminal_height/image_height)
+    image_width *= scale
+    image_height *= scale
 
     vertical_pixel_ratio = rows/terminal_height
     horizontal_pixel_ratio = columns/terminal_width

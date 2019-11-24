@@ -1,0 +1,3 @@
+[submodule "image_size"]
+	path = image_size
+	url = https://github.com/scardine/image_size
