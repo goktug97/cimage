@@ -6,6 +6,34 @@ import ueberzug.lib.v0 as ueberzug
 import array, fcntl, termios
 import select
 from image_size import get_image_size
+import argparse
+import types
+from pathlib import Path
+
+config_path = os.path.join(str(Path.home()), '.config/cimage/config')
+if not os.path.exists(config_path):
+    config_path = os.path.join(os.path.dirname(__file__), 'config')
+config = types.ModuleType('config', 'Config')
+with open(config_path) as f:
+    code = compile(f.read(), "config", "exec")
+    exec(code, config.__dict__)
+
+parser = argparse.ArgumentParser(description='Python Command Line Image Viewer')
+parser.add_argument('--input', type=str, help='Input Image.', required=True)
+parser.add_argument('--verbose', dest='verbose', action='store_true')
+parser.set_defaults(verbose=False)
+args = parser.parse_args()
+
+if args.verbose:
+    print(f"Read config file: {config_path}")
+
+def exception_handler(exception_type, exception, traceback, debug_hook=sys.excepthook):
+    if args.verbose:
+        debug_hook(exception_type, exception, traceback)
+    else:
+        print(f'{exception_type.__name__}: {exception}')
+
+sys.excepthook = exception_handler
 
 # https://stackoverflow.com/a/31736883
 class KeyPoller():
@@ -30,11 +58,9 @@ class KeyPoller():
 
 
 @ueberzug.Canvas()
-def main(canvas): # Columns, Rows number of char
-    # Width, Height number of pixel
-    image_path = sys.argv[1]
+def main(canvas):
     try:
-        image_width, image_height = get_image_size.get_image_size(image_path)
+        image_width, image_height = get_image_size.get_image_size(args.input)
     except get_image_size.UnknownImageFormat:
         raise ValueError("Unknown Image Format")
 
@@ -63,7 +89,7 @@ def main(canvas): # Columns, Rows number of char
                 width=canvas_width,
                 height = rows-y,
                 scaler=ueberzug.ScalerOption.FIT_CONTAIN.value)
-        image.path = image_path
+        image.path = args.input
         image.visibility = ueberzug.Visibility.VISIBLE
 
         with KeyPoller() as keyPoller:
@@ -73,15 +99,15 @@ def main(canvas): # Columns, Rows number of char
                 image.width = columns
                 image.height = rows - y
                 if key is not None:
-                    if key == 'j':
+                    if key == config.KeyBindings.move_image_down:
                         image.y += 1
-                    elif key == 'k':
+                    elif key == config.KeyBindings.move_image_up:
                         image.y -= 1
-                    elif key == 'l':
-                        image.x += 1
-                    elif key == 'h':
+                    elif key == config.KeyBindings.move_image_left:
                         image.x -= 1
-                    elif key == 'q' or ord(key) == 27:
+                    elif key == config.KeyBindings.move_image_right:
+                        image.x += 1
+                    elif key == config.KeyBindings.quit_program or ord(key) == 27:
                         break
 
 
