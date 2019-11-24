@@ -7,36 +7,28 @@ import time
 import subprocess
 from PIL import Image
 import array, fcntl, termios
+import select
 
-def read_single_keypress():
-    fd = sys.stdin.fileno()
-    flags_save = fcntl.fcntl(fd, fcntl.F_GETFL)
-    attrs_save = termios.tcgetattr(fd)
-    attrs = list(attrs_save)
-    attrs[0] &= ~(termios.IGNBRK | termios.BRKINT | termios.PARMRK
-                  | termios.ISTRIP | termios.INLCR | termios. IGNCR
-                  | termios.ICRNL | termios.IXON )
-    attrs[1] &= ~termios.OPOST
-    attrs[2] &= ~(termios.CSIZE | termios. PARENB)
-    attrs[2] |= termios.CS8
-    attrs[3] &= ~(termios.ECHONL | termios.ECHO | termios.ICANON
-                  | termios.ISIG | termios.IEXTEN)
-    termios.tcsetattr(fd, termios.TCSANOW, attrs)
-    fcntl.fcntl(fd, fcntl.F_SETFL, flags_save & ~os.O_NONBLOCK)
-    ret = []
-    try:
-        ret.append(sys.stdin.read(1))
-        fcntl.fcntl(fd, fcntl.F_SETFL, flags_save | os.O_NONBLOCK)
-        c = sys.stdin.read(1)
-        while len(c) > 0:
-            ret.append(c)
-            c = sys.stdin.read(1)
-    except KeyboardInterrupt:
-        ret.append('\x03')
-    finally:
-        termios.tcsetattr(fd, termios.TCSAFLUSH, attrs_save)
-        fcntl.fcntl(fd, fcntl.F_SETFL, flags_save)
-    return tuple(ret)
+# https://stackoverflow.com/a/31736883
+class KeyPoller():
+    def __enter__(self):
+        self.fd = sys.stdin.fileno()
+        self.new_term = termios.tcgetattr(self.fd)
+        self.old_term = termios.tcgetattr(self.fd)
+
+        self.new_term[3] = (self.new_term[3] & ~termios.ICANON & ~termios.ECHO)
+        termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.new_term)
+
+        return self
+
+    def __exit__(self, type, value, traceback):
+        termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.old_term)
+
+    def poll(self):
+        dr,dw,de = select.select([sys.stdin], [], [], 0.0)
+        if not dr == []:
+            return sys.stdin.read(1)
+        return None
 
 @ueberzug.Canvas()
 def main(canvas):
@@ -56,14 +48,6 @@ def main(canvas):
 
     canvas_height = rows
 
-    fd = sys.stdin.fileno()
-    oldterm = termios.tcgetattr(fd)
-    newattr = termios.tcgetattr(fd)
-    newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
-    termios.tcsetattr(fd, termios.TCSANOW, newattr)
-    oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
-    fcntl.fcntl(fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
-
     if image_width > terminal_width:
         canvas_width = columns
         x, y = 0, 0
@@ -78,21 +62,25 @@ def main(canvas):
                 scaler=ueberzug.ScalerOption.FIT_CONTAIN.value)
         image.path = image_path
         image.visibility = ueberzug.Visibility.VISIBLE
-        while True:
-            key = read_single_keypress()[0]
-            rows, columns = map(int, os.popen('stty size', 'r').read().split())
-            image.width = columns
-            image.height = rows - y
-            if key == 'j':
-                image.y += 1
-            elif key == 'k':
-                image.y -= 1
-            elif key == 'l':
-                image.x += 1
-            elif key == 'h':
-                image.x -= 1
-            elif key == 'q' or ord(key) == 27:
-                break
+
+        with KeyPoller() as keyPoller:
+            while True:
+                key = keyPoller.poll()
+                rows, columns = map(int, os.popen('stty size', 'r').read().split())
+                image.width = columns
+                image.height = rows - y
+                if key is not None:
+                    if key == 'j':
+                        image.y += 1
+                    elif key == 'k':
+                        image.y -= 1
+                    elif key == 'l':
+                        image.x += 1
+                    elif key == 'h':
+                        image.x -= 1
+                    elif key == 'q' or ord(key) == 27:
+                        break
+
 
 if __name__ == '__main__':
     main()
