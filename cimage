@@ -19,10 +19,14 @@ with open(config_path) as f:
     exec(code, config.__dict__)
 
 parser = argparse.ArgumentParser(description='Python Command Line Image Viewer')
-parser.add_argument('--input', type=str, help='Input Image.', nargs='*', required=True)
+parser.add_argument('input', type=str, help='Input Image.', nargs='*')
 parser.add_argument('--verbose', dest='verbose', action='store_true')
 parser.set_defaults(verbose=False)
 args = parser.parse_args()
+
+if not len(args.input):
+    parser.print_help(sys.stderr)
+    sys.exit(1)
 
 if args.verbose:
     print(f"Read config file: {config_path}")
