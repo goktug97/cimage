@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import ueberzug.lib.v0 as ueberzug
+import time
+import subprocess
+from PIL import Image
+import array, fcntl, termios
+
+def read_single_keypress():
+    fd = sys.stdin.fileno()
+    flags_save = fcntl.fcntl(fd, fcntl.F_GETFL)
+    attrs_save = termios.tcgetattr(fd)
+    attrs = list(attrs_save)
+    attrs[0] &= ~(termios.IGNBRK | termios.BRKINT | termios.PARMRK
+                  | termios.ISTRIP | termios.INLCR | termios. IGNCR
+                  | termios.ICRNL | termios.IXON )
+    attrs[1] &= ~termios.OPOST
+    attrs[2] &= ~(termios.CSIZE | termios. PARENB)
+    attrs[2] |= termios.CS8
+    attrs[3] &= ~(termios.ECHONL | termios.ECHO | termios.ICANON
+                  | termios.ISIG | termios.IEXTEN)
+    termios.tcsetattr(fd, termios.TCSANOW, attrs)
+    fcntl.fcntl(fd, fcntl.F_SETFL, flags_save & ~os.O_NONBLOCK)
+    ret = []
+    try:
+        ret.append(sys.stdin.read(1))
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags_save | os.O_NONBLOCK)
+        c = sys.stdin.read(1)
+        while len(c) > 0:
+            ret.append(c)
+            c = sys.stdin.read(1)
+    except KeyboardInterrupt:
+        ret.append('\x03')
+    finally:
+        termios.tcsetattr(fd, termios.TCSAFLUSH, attrs_save)
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags_save)
+    return tuple(ret)
+
+@ueberzug.Canvas()
+def main(canvas):
+    # Columns, Rows number of char
+    # Width, Height number of pixel
+    image_path = sys.argv[1]
+    image = Image.open(image_path)
+    rows, columns = map(int, os.popen('stty size', 'r').read().split())
+    buf = array.array('H', [0, 0, 0, 0])
+    fcntl.ioctl(1, termios.TIOCGWINSZ, buf)
+    terminal_width, terminal_height = buf[2], buf[3]
+    image.thumbnail((terminal_width, terminal_height), Image.ANTIALIAS)
+    image_width, image_height = image.size
+
+    vertical_pixel_ratio = rows/terminal_height
+    horizontal_pixel_ratio = columns/terminal_width
+
+    canvas_height = rows
+
+    fd = sys.stdin.fileno()
+    oldterm = termios.tcgetattr(fd)
+    newattr = termios.tcgetattr(fd)
+    newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
+    termios.tcsetattr(fd, termios.TCSANOW, newattr)
+    oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
+
+    if image_width > terminal_width:
+        canvas_width = columns
+        x, y = 0, 0
+    else:
+        x = int((terminal_width - image_width)/2 * horizontal_pixel_ratio)
+        y = int((terminal_height - image_height)/2 * vertical_pixel_ratio)
+
+        canvas_width = columns
+        image = canvas.create_placement('image', x=x, y=y,
+                width=canvas_width,
+                height = rows-y,
+                scaler=ueberzug.ScalerOption.FIT_CONTAIN.value)
+        image.path = image_path
+        image.visibility = ueberzug.Visibility.VISIBLE
+        while True:
+            key = read_single_keypress()[0]
+            rows, columns = map(int, os.popen('stty size', 'r').read().split())
+            image.width = columns
+            image.height = rows - y
+            if key == 'j':
+                image.y += 1
+            elif key == 'k':
+                image.y -= 1
+            elif key == 'l':
+                image.x += 1
+            elif key == 'h':
+                image.x -= 1
+            elif key == 'q' or ord(key) == 27:
+                break
+
+if __name__ == '__main__':
+    main()
+
