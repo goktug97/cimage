@@ -56,21 +56,24 @@ class KeyPoller():
             return sys.stdin.read(1)
         return None
 
-
-@ueberzug.Canvas()
-def main(canvas):
-    n_inputs = len(args.input)
-    current_index = 0
+def image_size(path):
     try:
-        image_width, image_height = get_image_size.get_image_size(
-            args.input[current_index])
+        image_width, image_height = get_image_size.get_image_size(path)
+        return image_width, image_height
     except get_image_size.UnknownImageFormat:
         raise ValueError("Unknown Image Format")
 
+def terminal_size():
     rows, columns = map(int, os.popen('stty size', 'r').read().split())
     buf = array.array('H', [0, 0, 0, 0])
     fcntl.ioctl(1, termios.TIOCGWINSZ, buf)
     terminal_width, terminal_height = buf[2], buf[3]
+    return rows, columns, terminal_width, terminal_height
+
+def calculate_pos_and_size(idx):
+    rows, columns, terminal_width, terminal_height = terminal_size()
+
+    image_width, image_height = image_size(args.input[idx])
     scale = min(terminal_width/image_width, terminal_height/image_height)
     image_width *= scale
     image_height *= scale
@@ -78,47 +81,58 @@ def main(canvas):
     vertical_pixel_ratio = rows/terminal_height
     horizontal_pixel_ratio = columns/terminal_width
 
-    canvas_height = rows
+    x = int((terminal_width - image_width)/2 * horizontal_pixel_ratio) - 1
+    y = int((terminal_height - image_height)/2 * vertical_pixel_ratio) - 1
 
-    if image_width > terminal_width:
-        canvas_width = columns
-        x, y = 0, 0
-    else:
-        x = int((terminal_width - image_width)/2 * horizontal_pixel_ratio)
-        y = int((terminal_height - image_height)/2 * vertical_pixel_ratio)
+    return x, y, columns, rows-y
 
-        canvas_width = columns
-        image = canvas.create_placement('image', x=x, y=y,
-                width=canvas_width,
-                height = rows-y,
-                scaler=ueberzug.ScalerOption.FIT_CONTAIN.value)
-        image.path = args.input[current_index]
-        image.visibility = ueberzug.Visibility.VISIBLE
+@ueberzug.Canvas()
+def main(canvas):
+    n_inputs = len(args.input)
+    current_index = 0
 
-        with KeyPoller() as keyPoller:
-            while True:
-                key = keyPoller.poll()
-                rows, columns = map(int, os.popen('stty size', 'r').read().split())
-                image.width = columns
-                image.height = rows - y
-                image.path = args.input[current_index]
-                if key is not None:
-                    if key == config.KeyBindings.move_image_down:
-                        image.y += 1
-                    elif key == config.KeyBindings.move_image_up:
-                        image.y -= 1
-                    elif key == config.KeyBindings.move_image_left:
-                        image.x -= 1
-                    elif key == config.KeyBindings.move_image_right:
-                        image.x += 1
-                    elif key == config.KeyBindings.next_image:
-                        current_index += 1
-                        current_index %= n_inputs
-                    elif key == config.KeyBindings.previous_image:
-                        current_index -= 1
-                        current_index %= n_inputs
-                    elif key == config.KeyBindings.quit_program or ord(key) == 27:
-                        break
+    x, y, width, height = calculate_pos_and_size(current_index)
+
+    image = canvas.create_placement('image', x=x, y=y,
+            width=width,
+            height=height,
+            scaler=ueberzug.ScalerOption.FIT_CONTAIN.value)
+    image.path = args.input[current_index]
+    image.visibility = ueberzug.Visibility.VISIBLE
+
+    prev_width, prev_height = width, height
+    with KeyPoller() as keyPoller:
+        while True:
+            key = keyPoller.poll()
+            image.path = args.input[current_index]
+
+            x, y, width, height = calculate_pos_and_size(current_index)
+            if prev_width != width or prev_height != height:
+                prev_width = width
+                prev_height = height
+                image.x = x
+                image.y = y
+
+            image.width = width
+            image.height = height
+
+            if key is not None:
+                if key == config.KeyBindings.move_image_down:
+                    image.y += 1
+                elif key == config.KeyBindings.move_image_up:
+                    image.y -= 1
+                elif key == config.KeyBindings.move_image_left:
+                    image.x -= 1
+                elif key == config.KeyBindings.move_image_right:
+                    image.x += 1
+                elif key == config.KeyBindings.next_image:
+                    current_index += 1
+                    current_index %= n_inputs
+                elif key == config.KeyBindings.previous_image:
+                    current_index -= 1
+                    current_index %= n_inputs
+                elif key == config.KeyBindings.quit_program or ord(key) == 27:
+                    break
 
 
 if __name__ == '__main__':
