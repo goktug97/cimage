@@ -9,6 +9,7 @@ from image_size import get_image_size
 import argparse
 import types
 from pathlib import Path
+import atexit
 
 config_path = os.path.join(str(Path.home()), '.config/cimage/config')
 if not os.path.exists(config_path):
@@ -19,7 +20,7 @@ with open(config_path) as f:
     exec(code, config.__dict__)
 
 parser = argparse.ArgumentParser(description='Python Command Line Image Viewer')
-parser.add_argument('input', type=str, help='Input Image.', nargs='*')
+parser.add_argument('input', type=str, help='Input Images.', nargs='*')
 parser.add_argument('--verbose', dest='verbose', action='store_true')
 parser.set_defaults(verbose=False)
 args = parser.parse_args()
@@ -30,6 +31,19 @@ if not len(args.input):
 
 if args.verbose:
     print(f"Read config file: {config_path}")
+
+def hide_cursor():
+    sys.stdout.write("\033[?25l")
+    sys.stdout.flush()
+
+def show_cursor():
+    sys.stdout.write("\033[?25h")
+    sys.stdout.flush()
+
+def clean():
+    show_cursor()
+
+atexit.register(clean)
 
 def exception_handler(exception_type, exception, traceback, debug_hook=sys.excepthook):
     if args.verbose:
@@ -105,10 +119,12 @@ def main(canvas):
     image.visibility = ueberzug.Visibility.VISIBLE
 
     prev_width, prev_height, prev_idx = width, height, current_idx
+    hide_cursor()
     with KeyPoller() as keyPoller:
         while True:
             key = keyPoller.poll()
             image.path = args.input[current_idx]
+            print(f'[{current_idx+1}/{n_inputs}]', end='\r')
 
             x, y, width, height = calculate_pos_and_size(current_idx)
             if prev_width != width or prev_height != height or prev_idx != current_idx:
@@ -141,9 +157,13 @@ def main(canvas):
                 elif key == config.KeyBindings.zoom_out:
                     image.width -= 1
                     image.height -= 1
+                elif key == config.KeyBindings.reset:
+                    image.width = width
+                    image.height = height
+                    image.x = x
+                    image.y = y
                 elif key == config.KeyBindings.quit_program or ord(key) == 27:
                     break
-
 
 if __name__ == '__main__':
     main()

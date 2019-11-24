@@ -13,3 +13,4 @@ class KeyBindings:
     quit_program: str = 'q'
     zoom_in: str = 'K'
     zoom_out: str = 'J'
+    reset: str = 'r'
