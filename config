@@ -8,4 +8,6 @@ class KeyBindings:
     move_image_right: str = 'l'
     move_image_up: str = 'k'
     move_image_down: str = 'j'
+    next_image: str = 'n'
+    previous_image: str = 'p'
     quit_program: str = 'q'

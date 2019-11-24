@@ -19,7 +19,7 @@ with open(config_path) as f:
     exec(code, config.__dict__)
 
 parser = argparse.ArgumentParser(description='Python Command Line Image Viewer')
-parser.add_argument('--input', type=str, help='Input Image.', required=True)
+parser.add_argument('--input', type=str, help='Input Image.', nargs='*', required=True)
 parser.add_argument('--verbose', dest='verbose', action='store_true')
 parser.set_defaults(verbose=False)
 args = parser.parse_args()
@@ -59,8 +59,11 @@ class KeyPoller():
 
 @ueberzug.Canvas()
 def main(canvas):
+    n_inputs = len(args.input)
+    current_index = 0
     try:
-        image_width, image_height = get_image_size.get_image_size(args.input)
+        image_width, image_height = get_image_size.get_image_size(
+            args.input[current_index])
     except get_image_size.UnknownImageFormat:
         raise ValueError("Unknown Image Format")
 
@@ -89,7 +92,7 @@ def main(canvas):
                 width=canvas_width,
                 height = rows-y,
                 scaler=ueberzug.ScalerOption.FIT_CONTAIN.value)
-        image.path = args.input
+        image.path = args.input[current_index]
         image.visibility = ueberzug.Visibility.VISIBLE
 
         with KeyPoller() as keyPoller:
@@ -98,6 +101,7 @@ def main(canvas):
                 rows, columns = map(int, os.popen('stty size', 'r').read().split())
                 image.width = columns
                 image.height = rows - y
+                image.path = args.input[current_index]
                 if key is not None:
                     if key == config.KeyBindings.move_image_down:
                         image.y += 1
@@ -107,6 +111,12 @@ def main(canvas):
                         image.x -= 1
                     elif key == config.KeyBindings.move_image_right:
                         image.x += 1
+                    elif key == config.KeyBindings.next_image:
+                        current_index += 1
+                        current_index %= n_inputs
+                    elif key == config.KeyBindings.previous_image:
+                        current_index -= 1
+                        current_index %= n_inputs
                     elif key == config.KeyBindings.quit_program or ord(key) == 27:
                         break
 
