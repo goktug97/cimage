@@ -10,20 +10,24 @@ import argparse
 import types
 from pathlib import Path
 import atexit
+import glob
+
+parser = argparse.ArgumentParser(description='Python Command Line Image Viewer')
+parser.add_argument('input', type=str, help='Input Images.', nargs='*')
+parser.add_argument('--verbose', dest='verbose', action='store_true')
+parser.add_argument('--no-config', dest='no_config',
+                    action='store_true', help="don't load user configuration if set")
+parser.set_defaults(verbose=False)
+parser.set_defaults(no_config=False)
+args = parser.parse_args()
 
 config_path = os.path.join(str(Path.home()), '.config/cimage/config')
-if not os.path.exists(config_path):
+if not os.path.exists(config_path) or args.no_config:
     config_path = os.path.join(os.path.dirname(__file__), 'config.py')
 config = types.ModuleType('config', 'Config')
 with open(config_path) as f:
     code = compile(f.read(), "config", "exec")
     exec(code, config.__dict__)
-
-parser = argparse.ArgumentParser(description='Python Command Line Image Viewer')
-parser.add_argument('input', type=str, help='Input Images.', nargs='*')
-parser.add_argument('--verbose', dest='verbose', action='store_true')
-parser.set_defaults(verbose=False)
-args = parser.parse_args()
 
 if not len(args.input):
     parser.print_help(sys.stderr)
@@ -88,14 +92,38 @@ def terminal_size():
     terminal_width, terminal_height = buf[2], buf[3]
     return rows, columns, terminal_width, terminal_height
 
+def insensitive_glob(pattern):
+    def either(c):
+        return '[%s%s]' % (c.lower(), c.upper()) if c.isalpha() else c
+    return glob.glob(''.join(map(either, pattern)))
 
 class ImageViewer(object):
     def __init__(self):
         self.image_sizes = []
-        for image_path in args.input:
-            self.image_sizes.append(image_size(image_path))
+        self.images = []
+        file_types = ['*.bmp', '*.gif', '*.ico', '*.jpeg', '*.png', '*.tiff']
+
+        for input in args.input:
+            if os.path.isdir(input):
+                for file_type in file_types:
+                    images = insensitive_glob(os.path.join(input, file_type))
+                    [self.process_path(image) for image in images]
+            else:
+                self.process_path(input)
+
+        if not len(self.images):
+            raise ValueError('No images are found')
+
         self.current_idx = 0
-        self.n_inputs = len(args.input)
+        self.n_inputs = len(self.images)
+
+    def process_path(self, path):
+        try:
+            image_width, image_height = get_image_size.get_image_size(path)
+            self.images.append(path)
+            self.image_sizes.append([image_width, image_height])
+        except get_image_size.UnknownImageFormat:
+            print(f'Unknown Image Format: {path}')
 
     def calculate_pos_and_size(self):
         rows, columns, terminal_width, terminal_height = terminal_size()
@@ -121,7 +149,7 @@ class ImageViewer(object):
                 width=width,
                 height=height,
                 scaler=ueberzug.ScalerOption.FIT_CONTAIN.value)
-        image.path = args.input[self.current_idx]
+        image.path = self.images[self.current_idx]
         image.visibility = ueberzug.Visibility.VISIBLE
 
         prev_width, prev_height, prev_idx = width, height, self.current_idx
@@ -130,7 +158,7 @@ class ImageViewer(object):
         with KeyPoller() as keyPoller:
             while True:
                 key = keyPoller.poll()
-                image.path = args.input[self.current_idx]
+                image.path = self.images[self.current_idx]
                 print(f'[{self.current_idx+1}/{self.n_inputs}]', end='\r')
 
                 x, y, width, height = self.calculate_pos_and_size()
