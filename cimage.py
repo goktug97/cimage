@@ -174,7 +174,10 @@ class ImageViewer(object):
                     elif key == config.KeyBindings.quit_program or ord(key) == 27:
                         break
 
+def main():
+    ImageViewer().main()
+
 
 if __name__ == '__main__':
-    ImageViewer().main()
+    main()
 
