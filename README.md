@@ -1,6 +1,8 @@
 Cimage: Command Line Image Viewer
 ===================================
 
+![Example Screenshot](https://github.com/goktug97/cimage/blob/master/example.png)
+
 ### Dependencies
 - [ueberzug](https://github.com/seebye/ueberzug)
 
