@@ -13,7 +13,7 @@ import atexit
 
 config_path = os.path.join(str(Path.home()), '.config/cimage/config')
 if not os.path.exists(config_path):
-    config_path = os.path.join(os.path.dirname(__file__), 'config')
+    config_path = os.path.join(os.path.dirname(__file__), 'config.py')
 config = types.ModuleType('config', 'Config')
 with open(config_path) as f:
     code = compile(f.read(), "config", "exec")
