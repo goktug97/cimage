@@ -88,83 +88,93 @@ def terminal_size():
     terminal_width, terminal_height = buf[2], buf[3]
     return rows, columns, terminal_width, terminal_height
 
-def calculate_pos_and_size(idx):
-    rows, columns, terminal_width, terminal_height = terminal_size()
 
-    image_width, image_height = image_size(args.input[idx])
-    scale = min(terminal_width/image_width, terminal_height/image_height)
-    image_width *= scale
-    image_height *= scale
+class ImageViewer(object):
+    def __init__(self):
+        self.image_sizes = []
+        for image_path in args.input:
+            self.image_sizes.append(image_size(image_path))
+        self.current_idx = 0
+        self.n_inputs = len(args.input)
 
-    vertical_pixel_ratio = rows/terminal_height
-    horizontal_pixel_ratio = columns/terminal_width
+    def calculate_pos_and_size(self):
+        rows, columns, terminal_width, terminal_height = terminal_size()
 
-    x = int((terminal_width - image_width)/2 * horizontal_pixel_ratio) - 1
-    y = int((terminal_height - image_height)/2 * vertical_pixel_ratio) - 1
+        image_width, image_height = self.image_sizes[self.current_idx]
+        scale = min(terminal_width/image_width, terminal_height/image_height)
+        image_width *= scale
+        image_height *= scale
 
-    return x, y, columns, rows-y
+        vertical_pixel_ratio = rows/terminal_height
+        horizontal_pixel_ratio = columns/terminal_width
 
-@ueberzug.Canvas()
-def main(canvas):
-    n_inputs = len(args.input)
-    current_idx = 0
+        x = int((terminal_width - image_width)/2 * horizontal_pixel_ratio) - 1
+        y = int((terminal_height - image_height)/2 * vertical_pixel_ratio) - 1
 
-    x, y, width, height = calculate_pos_and_size(current_idx)
+        return x, y, columns, rows-y
 
-    image = canvas.create_placement('image', x=x, y=y,
-            width=width,
-            height=height,
-            scaler=ueberzug.ScalerOption.FIT_CONTAIN.value)
-    image.path = args.input[current_idx]
-    image.visibility = ueberzug.Visibility.VISIBLE
+    @ueberzug.Canvas()
+    def main(self, canvas):
+        x, y, width, height = self.calculate_pos_and_size()
 
-    prev_width, prev_height, prev_idx = width, height, current_idx
-    hide_cursor()
-    with KeyPoller() as keyPoller:
-        while True:
-            key = keyPoller.poll()
-            image.path = args.input[current_idx]
-            print(f'[{current_idx+1}/{n_inputs}]', end='\r')
+        image = canvas.create_placement('image', x=x, y=y,
+                width=width,
+                height=height,
+                scaler=ueberzug.ScalerOption.FIT_CONTAIN.value)
+        image.path = args.input[self.current_idx]
+        image.visibility = ueberzug.Visibility.VISIBLE
 
-            x, y, width, height = calculate_pos_and_size(current_idx)
-            if prev_width != width or prev_height != height or prev_idx != current_idx:
-                image.width = width
-                image.height = height
-                prev_width = width
-                prev_height = height
-                prev_idx = current_idx
-                image.x = x
-                image.y = y
+        prev_width, prev_height, prev_idx = width, height, self.current_idx
+        hide_cursor()
 
-            if key is not None:
-                if key == config.KeyBindings.move_image_down:
-                    image.y += 1
-                elif key == config.KeyBindings.move_image_up:
-                    image.y -= 1
-                elif key == config.KeyBindings.move_image_left:
-                    image.x -= 1
-                elif key == config.KeyBindings.move_image_right:
-                    image.x += 1
-                elif key == config.KeyBindings.next_image:
-                    current_idx += 1
-                    current_idx %= n_inputs
-                elif key == config.KeyBindings.previous_image:
-                    current_idx -= 1
-                    current_idx %= n_inputs
-                elif key == config.KeyBindings.zoom_in:
-                    image.width += 1
-                    image.height += 1
-                elif key == config.KeyBindings.zoom_out:
-                    image.width = max(image.width-1, 1)
-                    image.height = max(image.height-1, 1)
-                elif key == config.KeyBindings.reset:
+        with KeyPoller() as keyPoller:
+            while True:
+                key = keyPoller.poll()
+                image.path = args.input[self.current_idx]
+                print(f'[{self.current_idx+1}/{self.n_inputs}]', end='\r')
+
+                x, y, width, height = self.calculate_pos_and_size()
+                if (prev_width != width or
+                    prev_height != height or
+                    prev_idx != self.current_idx):
                     image.width = width
                     image.height = height
+                    prev_width = width
+                    prev_height = height
+                    prev_idx = self.current_idx
                     image.x = x
                     image.y = y
-                elif key == config.KeyBindings.quit_program or ord(key) == 27:
-                    break
+
+                if key is not None:
+                    if key == config.KeyBindings.move_image_down:
+                        image.y += 1
+                    elif key == config.KeyBindings.move_image_up:
+                        image.y -= 1
+                    elif key == config.KeyBindings.move_image_left:
+                        image.x -= 1
+                    elif key == config.KeyBindings.move_image_right:
+                        image.x += 1
+                    elif key == config.KeyBindings.next_image:
+                        self.current_idx += 1
+                        self.current_idx %= self.n_inputs
+                    elif key == config.KeyBindings.previous_image:
+                        self.current_idx -= 1
+                        self.current_idx %= self.n_inputs
+                    elif key == config.KeyBindings.zoom_in:
+                        image.width += 1
+                        image.height += 1
+                    elif key == config.KeyBindings.zoom_out:
+                        image.width = max(image.width-1, 1)
+                        image.height = max(image.height-1, 1)
+                    elif key == config.KeyBindings.reset:
+                        image.width = width
+                        image.height = height
+                        image.x = x
+                        image.y = y
+                    elif key == config.KeyBindings.quit_program or ord(key) == 27:
+                        break
+
 
 if __name__ == '__main__':
-    main()
+    ImageViewer().main()
 
