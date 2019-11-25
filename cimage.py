@@ -78,13 +78,6 @@ class KeyPoller():
             return sys.stdin.read(1)
         return None
 
-def image_size(path):
-    try:
-        image_width, image_height = get_image_size.get_image_size(path)
-        return image_width, image_height
-    except get_image_size.UnknownImageFormat:
-        raise ValueError("Unknown Image Format")
-
 def terminal_size():
     rows, columns = map(int, os.popen('stty size', 'r').read().split())
     buf = array.array('H', [0, 0, 0, 0])
