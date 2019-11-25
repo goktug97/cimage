@@ -16,16 +16,17 @@ python3 setup.py install --user
 
 ### Usage
 ```
-usage: cimage [-h] [--verbose] [input [input ...]]
+usage: cimage [-h] [--verbose] [--no-config] [input [input ...]]
 
 Python Command Line Image Viewer
 
 positional arguments:
-  input       Input Images.
+  input        Input Images.
 
 optional arguments:
-  -h, --help  show this help message and exit
+  -h, --help   show this help message and exit
   --verbose
+  --no-config  don't load user configuration if set
 ```
 
 ### Default Keybindings
